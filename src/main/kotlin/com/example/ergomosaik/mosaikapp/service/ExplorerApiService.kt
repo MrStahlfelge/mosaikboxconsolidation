@@ -60,10 +60,30 @@ class ExplorerApiService(private val okHttpClient: OkHttpClient) {
                 )
         }
 
-    fun getCurrentBlockHeight(mainnet: Boolean) =
-        // TODO cache value
-        wrapCall {
-            (if (mainnet) api else testapi).getApiV1Blocks(0, 1, "height", "desc")
-        }.total
+    private var blockHeightUpdateTs: Long = 0
+    private var blockHeightVal: Long = 0
 
+    fun getCurrentBlockHeight(mainnet: Boolean): Long {
+
+        if (System.currentTimeMillis() - blockHeightUpdateTs > 5 * 60 * 1000L)
+            try {
+                blockHeightVal = wrapCall {
+                    (if (mainnet) api else testapi).getApiV1Blocks(0, 1, "height", "desc")
+                }.total.toLong()
+                blockHeightUpdateTs = System.currentTimeMillis()
+            } catch (t: Throwable) {
+                // ignore error, use cached value
+            }
+
+        return blockHeightVal
+    }
+
+    fun getMempoolTx(mainnet: Boolean, address: String, offset: Int, limit: Int) =
+        wrapCall {
+            (if (mainnet) api else testapi).getApiV1MempoolTransactionsByaddressP1(
+                address,
+                offset,
+                limit
+            )
+        }.items
 }
